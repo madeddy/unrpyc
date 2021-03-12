@@ -68,7 +68,7 @@ def extract_slot_rpyc(f, slot):
     """
     f.seek(0)
     data = f.read()
-    if data[:10] != "RENPY RPYC":
+    if data[:10] != b"RENPY RPYC":
         raise ValueError("Incorrect Header")
 
     position = 10
@@ -287,8 +287,8 @@ def read_ast(f):
     for extractor in EXTRACTORS:
         try:
             data = extractor(f, 1)
-        except ValueError as e:
-            diagnosis.append("strategy %s failed: %s" % (extractor.__name__, e.message))
+        except ValueError as err:
+            diagnosis.append("strategy %s failed: %s" % (extractor.__name__, err))
         else:
             diagnosis.append("strategy %s success" % extractor.__name__)
             raw_datas.add(data)
@@ -304,8 +304,8 @@ def read_ast(f):
     for raw_data in raw_datas:
         try:
             data, stmts, d = try_decrypt_section(raw_data)
-        except ValueError as e:
-            diagnosis.append(e.message)
+        except ValueError as err:
+            diagnosis.append(err)
         else:
             diagnosis.extend(d)
             with unrpyc.printlock:

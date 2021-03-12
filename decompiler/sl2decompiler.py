@@ -18,12 +18,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from __future__ import unicode_literals
-import sys
+
 from operator import itemgetter
 
-from util import DecompilerBase, First, reconstruct_paraminfo, \
-                 reconstruct_arginfo, split_logical_lines, Dispatcher
+from .util import DecompilerBase, First, reconstruct_paraminfo, \
+    reconstruct_arginfo, split_logical_lines, Dispatcher
 
 from renpy import ui, sl2
 from renpy.ast import PyExpr
@@ -311,13 +310,34 @@ class SL2Decompiler(DecompilerBase):
             keywords_somewhere = []
         keywords_by_line.append(current_line)
         last_keyword_line = keywords_by_line[-1][0]
+        # py3 compat: Comparison between different types has been removed from Py3
+        # and trows a TypeError. We need to catch None before the tricky line.
+
+        # Solution 1
+        # right compare side was in tests never zero so we should be able to replace None with 0, what gives us the needed int type on both sides
+        last_keyword_line = 0 if last_keyword_line is None else last_keyword_line
+
         children_with_keywords = []
         children_after_keywords = []
         for i in children:
+            # control print
+            print(f"sl2 comp:  i.location: {i.location[1]} last_keyword_line:  {last_keyword_line}")
             if i.location[1] > last_keyword_line:
                 children_after_keywords.append(i)
             else:
                 children_with_keywords.append((i.location[1], i))
+
+            # Solution 2
+            # None is lesser as all other types, so a 'greater as' test against it
+            # would always give True
+            # if last_keyword_line is None:
+            #     children_after_keywords.append(i)
+            # else:
+            #     if i.location[1] > last_keyword_line:
+            #         children_after_keywords.append(i)
+            #     else:
+            #         children_with_keywords.append((i.location[1], i))
+
         # the keywords in keywords_by_line[0] go on the line that starts the
         # block, not in it
         block_contents = sorted(keywords_by_line[1:] + children_with_keywords,
