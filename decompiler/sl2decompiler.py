@@ -309,34 +309,22 @@ class SL2Decompiler(DecompilerBase):
             current_line[1].extend(keywords_somewhere)
             keywords_somewhere = []
         keywords_by_line.append(current_line)
-        last_keyword_line = keywords_by_line[-1][0]
-        # py3 compat: Comparison between different types has been removed from Py3
-        # and trows a TypeError. We need to catch None before the tricky line.
-
-        # Solution 1
-        # right compare side was in tests never zero so we should be able to replace None with 0, what gives us the needed int type on both sides
-        last_keyword_line = 0 if last_keyword_line is None else last_keyword_line
-
+        # py3 compat: Comparison between different types was removed in py 3(TypeError)
+        # We need to catch None before the comparison line.
+        #
+        # Values in both cmp sides where in tests never zero or lower. Replacing
+        # 'None' with a lesser int value should work and gives us the needed
+        # int-type on both sides. We go with -1 incase 0 sometime still used is.
+        ln_num_kw = keywords_by_line[-1][0] if keywords_by_line[-1][0] is not \
+            None else -1
         children_with_keywords = []
         children_after_keywords = []
         for i in children:
-            # control print
-            print(f"sl2 comp:  i.location: {i.location[1]} last_keyword_line:  {last_keyword_line}")
-            if i.location[1] > last_keyword_line:
+            ln_num_child = i.location[1] if i.location[1] is not None else -1
+            if ln_num_child > ln_num_kw:
                 children_after_keywords.append(i)
             else:
                 children_with_keywords.append((i.location[1], i))
-
-            # Solution 2
-            # None is lesser as all other types, so a 'greater as' test against it
-            # would always give True
-            # if last_keyword_line is None:
-            #     children_after_keywords.append(i)
-            # else:
-            #     if i.location[1] > last_keyword_line:
-            #         children_after_keywords.append(i)
-            #     else:
-            #         children_with_keywords.append((i.location[1], i))
 
         # the keywords in keywords_by_line[0] go on the line that starts the
         # block, not in it
