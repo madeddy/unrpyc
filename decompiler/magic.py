@@ -3,18 +3,11 @@
 # This module provides tools for safely analyizing pickle files programmatically
 
 import sys
-
-PY3 = sys.version_info >= (3, 0)
-PY2 = not PY3
-
 import types
 import pickle
 import struct
+from io import BytesIO
 
-if PY3:
-    from io import BytesIO as StringIO
-else:
-    from io import StringIO
 
 __all__ = [
     "load", "loads", "safe_load", "safe_loads", "safe_dump", "safe_dumps",
@@ -556,7 +549,7 @@ def loads(string, class_factory=None, encoding="bytes", errors="errors"):
     Simjilar to :func:`load`, but takes an 8-bit string (bytes in Python 3, str in Python 2)
     as its first argument instead of a binary :term:`file object`.
     """
-    return FakeUnpickler(StringIO(string), class_factory,
+    return FakeUnpickler(BytesIO(string), class_factory,
                          encoding=encoding, errors=errors).load()
 
 def safe_load(file, class_factory=None, safe_modules=(), use_copyreg=False,
@@ -598,7 +591,7 @@ def safe_loads(string, class_factory=None, safe_modules=(), use_copyreg=False,
     Similar to :func:`safe_load`, but takes an 8-bit string (bytes in Python 3, str in Python 2)
     as its first argument instead of a binary :term:`file object`.
     """
-    return SafeUnpickler(StringIO(string), class_factory, safe_modules, use_copyreg,
+    return SafeUnpickler(BytesIO(string), class_factory, safe_modules, use_copyreg,
                          encoding=encoding, errors=errors).load()
 
 def safe_dump(obj, file, protocol=pickle.HIGHEST_PROTOCOL):
@@ -611,7 +604,7 @@ def safe_dumps(obj, protocol=pickle.HIGHEST_PROTOCOL):
     """
     A convenience function wrapping SafePickler. It functions similarly to pickle.dumps
     """
-    file = StringIO()
+    file = BytesIO()
     SafePickler(file, protocol).dump(obj)
     return file.getvalue()
 
