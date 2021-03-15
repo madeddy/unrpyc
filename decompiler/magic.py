@@ -282,7 +282,7 @@ class FakeModule(types.ModuleType):
             try:
                 __import__(parent_name)
                 parent = sys.modules[parent_name]
-            except:
+            except ModuleNotFoundError:
                 parent = FakeModule(parent_name)
             setattr(parent, child_name, self)
 
@@ -361,7 +361,7 @@ class FakePackage(FakeModule):
         if mod is None:
             try:
                 __import__(modname)
-            except:
+            except ModuleNotFoundError:
                 mod = FakePackage(modname)
             else:
                 mod = sys.modules[modname]
@@ -433,7 +433,7 @@ class FakeUnpickler(pickle._Unpickler):
         if mod is None:
             try:
                 __import__(module)
-            except:
+            except ModuleNotFoundError:
                 mod = FakeModule(module)
             else:
                 mod = sys.modules[module]
