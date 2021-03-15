@@ -399,7 +399,9 @@ class FakeUnpicklingError(pickle.UnpicklingError):
     """
     pass
 
-class FakeUnpickler(pickle.Unpickler if PY2 else pickle._Unpickler):
+
+# py3 combat: shouldn this be pickle.Unpickler on py3? cpickle?
+class FakeUnpickler(pickle._Unpickler):
     """
     A forgiving unpickler. On uncountering references to class definitions
     in the pickle stream which it cannot locate, it will create fake classes
@@ -421,14 +423,10 @@ class FakeUnpickler(pickle.Unpickler if PY2 else pickle._Unpickler):
     It inherits from :class:`pickle.Unpickler`. (In Python 3 this is actually
     ``pickle._Unpickler``)
     """
-    if PY2:
-        def __init__(self, file, class_factory=None, encoding="bytes", errors="strict"):
-            pickle.Unpickler.__init__(self, file,)
-            self.class_factory = class_factory or FakeClassFactory()
-    else:
-        def __init__(self, file, class_factory=None, encoding="bytes", errors="strict"):
-            super().__init__(file, fix_imports=False, encoding=encoding, errors=errors)
-            self.class_factory = class_factory or FakeClassFactory()
+
+    def __init__(self, file, class_factory=None, encoding="bytes", errors="strict"):
+        super().__init__(file, fix_imports=False, encoding=encoding, errors=errors)
+        self.class_factory = class_factory or FakeClassFactory()
 
     def find_class(self, module, name):
         mod = sys.modules.get(module, None)
@@ -504,7 +502,9 @@ class SafeUnpickler(FakeUnpickler):
         else:
             return self.class_factory("extension_code_{0}".format(code), "copyreg")
 
-class SafePickler(pickle.Pickler if PY2 else pickle._Pickler):
+
+# py3 combat: shouldn this be pickle.Pickler on py3? cpickle?
+class SafePickler(pickle._Pickler):
     """
     A pickler which can repickle object hierarchies containing objects created by SafeUnpickler.
     Due to reasons unknown, pythons pickle implementation will normally check if a given class
