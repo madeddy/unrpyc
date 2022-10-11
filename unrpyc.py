@@ -107,7 +107,9 @@ class Sentinel(magic.FakeStrict, object):
 
 class_factory = magic.FakeClassFactory((frozenset, PyExpr, PyCode, RevertableList, RevertableDict, RevertableSet, Sentinel), magic.FakeStrict)
 
-printlock = Lock()
+printlock = None
+if __name__ == '__main__':
+    printlock = Lock()  # in subprocesses the lock should be reused from parent, using sharelock function
 
 # needs class_factory
 import deobfuscate  # nopep8 # noqa 
@@ -308,7 +310,8 @@ def main():
         # only one thread running, which is inefficient. Avoid this by starting
         # big files first.
         files.sort(key=itemgetter(2), reverse=True)
-        results = Pool(int(args.processes), sharelock, [printlock]).map(worker, files, 1)
+        with Pool(int(args.processes), sharelock, [printlock]) as pool:
+            results = pool.map(worker, files, 1)
     else:
         # Decompile in the order Ren'Py loads in
         files.sort(key=itemgetter(1))
