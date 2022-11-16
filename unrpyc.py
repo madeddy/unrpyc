@@ -26,9 +26,28 @@ import glob
 import itertools
 import traceback
 import struct
+
 import zlib
 from multiprocessing import Pool, Lock, cpu_count
+
 from operator import itemgetter
+
+try:
+    from multiprocessing import Pool, Lock, cpu_count
+except ImportError:
+    # Mock required support when multiprocessing is unavailable
+    def cpu_count():
+        return 1
+
+    class Lock:
+        def __enter__(self):
+            pass
+        def __exit__(self, type, value, traceback):
+            pass
+        def acquire(self, block=True, timeout=None):
+            pass
+        def release(self):
+            pass
 
 import decompiler
 from decompiler import magic, astdump, translate
@@ -37,19 +56,28 @@ from decompiler import magic, astdump, translate
 
 class PyExpr(magic.FakeStrict, str):
     __module__ = "renpy.ast"
-    def __new__(cls, s, filename, linenumber):
+    def __new__(cls, s, filename, linenumber, py=None):
         self = str.__new__(cls, s)
         self.filename = filename
         self.linenumber = linenumber
+        self.py = py
         return self
 
     def __getnewargs__(self):
-        return str(self), self.filename, self.linenumber
+        if self.py is not None:
+            return str(self), self.filename, self.linenumber, self.py
+        else:
+            return str(self), self.filename, self.linenumber
+
 
 class PyCode(magic.FakeStrict):
     __module__ = "renpy.ast"
     def __setstate__(self, state):
-        (_, self.source, self.location, self.mode) = state
+        if len(state) == 4:
+            (_, self.source, self.location, self.mode) = state
+            self.py = None
+        else:
+            (_, self.source, self.location, self.mode, self.py) = state
         self.bytecode = None
 
 class RevertableList(magic.FakeStrict, list):
@@ -80,7 +108,7 @@ class Sentinel(magic.FakeStrict, object):
         obj.name = name
         return obj
 
-class_factory = magic.FakeClassFactory((PyExpr, PyCode, RevertableList, RevertableDict, RevertableSet, Sentinel), magic.FakeStrict)
+class_factory = magic.FakeClassFactory((frozenset, PyExpr, PyCode, RevertableList, RevertableDict, RevertableSet, Sentinel), magic.FakeStrict)
 
 printlock = Lock()
 
@@ -109,6 +137,7 @@ def read_ast_from_file(in_file):
     # py3 compat: zlib should be enough, no need for codecs
     # raw_contents = raw_contents.decode('zlib')
     raw_contents = zlib.decompress(raw_contents)
+
     data, stmts = magic.safe_loads(raw_contents, class_factory, {"_ast", "collections"})
     return stmts
 
@@ -187,6 +216,7 @@ def sharelock(lock):
 
 def main():
     # python27 unrpyc.py [-c] [-d] [--python-screens|--ast-screens|--no-screens] file [file ...]
+    cc_num = cpu_count()
     parser = argparse.ArgumentParser(description="Decompile .rpyc/.rpymc files")
 
     parser.add_argument('-c', '--clobber', dest='clobber', action='store_true',
@@ -195,8 +225,10 @@ def main():
     parser.add_argument('-d', '--dump', dest='dump', action='store_true',
                         help="instead of decompiling, pretty print the ast to a file")
 
-    parser.add_argument('-p', '--processes', dest='processes', action='store', default=cpu_count(),
-                        help="use the specified number of processes to decompile")
+    parser.add_argument('-p', '--processes', dest='processes', action='store', type=int,
+                        choices=range(1, cc_num), default=cc_num - 1 if cc_num > 2 else 1,
+                        help="use the specified number or processes to decompile."
+                        "Defaults to the amount of hw threads available minus one, disabled when muliprocessing is unavailable.")
 
     parser.add_argument('-t', '--translation-file', dest='translation_file', action='store', default=None,
                         help="use the specified file to translate during decompilation")
