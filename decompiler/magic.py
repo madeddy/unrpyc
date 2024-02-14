@@ -14,7 +14,7 @@ import struct
 if PY3:
     from io import BytesIO as StringIO
 else:
-    from cStringIO import StringIO
+    from io import StringIO
 
 __all__ = [
     "load", "loads", "safe_load", "safe_loads", "safe_dump", "safe_dumps",
@@ -109,7 +109,9 @@ A barebones instance of :class:`FakeClassType`. Inherit from this to create fake
 class FakeStrict(FakeClass, object):
     def __new__(cls, *args, **kwargs):
         self = FakeClass.__new__(cls)
-        if args or kwargs:
+        # renpy 7.5/8 combat; Check if correctly initialized
+        # if args or kwargs:
+        if not (any([(), ([], )]) in args) and kwargs != {}:
             raise FakeUnpicklingError("{0} was instantiated with unexpected arguments {1}, {2}".format(cls, args, kwargs))
         return self
 
@@ -589,8 +591,11 @@ def safe_load(file, class_factory=None, safe_modules=(), use_copyreg=False,
     return SafeUnpickler(file, class_factory, safe_modules, use_copyreg,
                          encoding=encoding, errors=errors).load()
 
+
+# py3 compat: at least needed if data src is py2 (also py3 renpy ?)
+# old py2: encoding="bytes"
 def safe_loads(string, class_factory=None, safe_modules=(), use_copyreg=False,
-               encoding="bytes", errors="errors"):
+               encoding="utf-8", errors="errors"):
     """
     Similar to :func:`safe_load`, but takes an 8-bit string (bytes in Python 3, str in Python 2)
     as its first argument instead of a binary :term:`file object`.

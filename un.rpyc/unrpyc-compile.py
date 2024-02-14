@@ -20,8 +20,6 @@
 
 import os
 import os.path as path
-import codecs
-import traceback
 import struct
 
 import decompiler
@@ -30,16 +28,18 @@ import magic
 # these named classes need some special handling for us to be able to reconstruct ren'py ASTs from pickles
 SPECIAL_CLASSES = [set, frozenset]
 
+
 @SPECIAL_CLASSES.append
-class PyExpr(magic.FakeStrict, unicode):
+class PyExpr(magic.FakeStrict, str):
     __module__ = "renpy.ast"
     def __new__(cls, s, filename, linenumber, py=None):
-        self = unicode.__new__(cls, s)
+        self = str.__new__(cls, s)
         self.filename = filename
         self.linenumber = linenumber
         self.py = py
         return self
 
+      
 @SPECIAL_CLASSES.append
 class PyCode(magic.FakeStrict):
     __module__ = "renpy.ast"
@@ -51,6 +51,7 @@ class PyCode(magic.FakeStrict):
             (_, self.source, self.location, self.mode, self.py) = state
         self.bytecode = None
 
+        
 @SPECIAL_CLASSES.append
 class Sentinel(magic.FakeStrict, object):
     __module__ = "renpy.object"
@@ -59,6 +60,7 @@ class Sentinel(magic.FakeStrict, object):
         obj.name = name
         return obj
 
+      
 # These used to live in renpy.python
 @SPECIAL_CLASSES.append
 class RevertableList(magic.FakeStrict, list):
@@ -66,12 +68,14 @@ class RevertableList(magic.FakeStrict, list):
     def __new__(cls):
         return list.__new__(cls)
 
+      
 @SPECIAL_CLASSES.append
 class RevertableDict(magic.FakeStrict, dict):
     __module__ = "renpy.python"
     def __new__(cls):
         return dict.__new__(cls)
 
+      
 @SPECIAL_CLASSES.append
 class RevertableSet(magic.FakeStrict, set):
     __module__ = "renpy.python"
@@ -128,7 +132,7 @@ def decompile_rpyc(data, abspath, init_offset):
     ast = read_ast_from_file(data)
 
     ensure_dir(out_filename)
-    with codecs.open(out_filename, 'w', encoding='utf-8') as out_file:
+    with open(out_filename, 'w', encoding='utf-8') as out_file:
         decompiler.pprint(out_file, ast, init_offset=init_offset)
     return True
 
@@ -143,7 +147,7 @@ def decompile_game():
         for abspath, fn, dir, data in sys.files:
             try:
                 decompile_rpyc(data, abspath, sys.init_offset)
-            except Exception, e:
+            except Exception as err:
                 f.write("\nFailed at decompiling {0}\n".format(abspath))
                 traceback = sys.modules['traceback']
                 traceback.print_exc(None, f)
