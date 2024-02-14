@@ -500,7 +500,7 @@ class WordConcatenator(object):
         self.reorderable = reorderable
 
     def append(self, *args):
-        self.words.extend([_f for _f in args if _f])
+        self.words.extend(filter(None, args))
 
     def join(self):
         if not self.words:

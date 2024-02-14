@@ -142,7 +142,9 @@ class AstDumper(object):
             name = ast.name[0]
             if isinstance(name, str):
                 name = name.encode('utf-8')
-            ast.name = (name.split(b'/')[-1], 0, 0)
+            # this bytes string should be uneeded
+            # ast.name = (name.split(b'/')[-1], 0, 0)
+            ast.name = (name.split('/')[-1], 0, 0)
         elif key == 'location' and isinstance(ast.location, tuple):
             if len(ast.location) == 4:
                 ast.location = (ast.location[0].split('/')[-1].split('\\')[-1], ast.location[1], ast.location[2], 0)
@@ -159,7 +161,7 @@ class AstDumper(object):
             # When no parameters exist, some versions of Ren'Py set parameters
             # to None and some don't set it at all.
             return False
-        elif (key == 'hide' and ast.hide == False and
+        elif (key == 'hide' and ast.hide is False and
             (isinstance(ast, renpy.ast.Python) or
             isinstance(ast, renpy.ast.Label))):
             # When hide isn't set, some versions of Ren'Py set it to False and
@@ -243,10 +245,11 @@ class AstDumper(object):
     def print_string(self, ast):
         # prints the representation of a string. If there are newlines in this string,
         # it will print it as a docstring.
-        if b'\n' in ast:
-            astlist = ast.split(b'\n')
-            if isinstance(ast, str):
-                self.p('u')
+        # py3 combat
+        if '\n' in ast:
+            astlist = ast.split('\n')
+            # if isinstance(ast, str):
+            #     self.p('u')
             self.p('"""')
             self.p(self.escape_string(astlist.pop(0)))
             for i, item in enumerate(astlist):
@@ -260,9 +263,10 @@ class AstDumper(object):
 
     def escape_string(self, string):
         # essentially the representation of a string without the surrounding quotes
+        # py3 combat: This cuts also the first line char away because the u is now missing
+        # if isinstance(string, str):
+        #     return repr(string)[2:-1]
         if isinstance(string, str):
-            return repr(string)[2:-1]
-        elif isinstance(string, str):
             return repr(string)[1:-1]
         else:
             return string
@@ -281,6 +285,7 @@ class AstDumper(object):
 
     def p(self, string):
         # write the string to the stream
+        # py3 combat: Not sure if the next line still needed is; the str() was unicode
         string = str(string)
         self.linenumber += string.count('\n')
         self.out_file.write(string)

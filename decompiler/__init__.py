@@ -672,7 +672,14 @@ class Decompiler(DecompilerBase):
             self.write(reconstruct_arginfo(arguments))
 
         if block is not None:
-            if isinstance(condition, str):
+            # FIXME: In py2 "condition" carried two types of string: u' prefixed and
+            # without. The check allowed only unicode for execution.In py3 both are str
+            # type, the second variant slips now in and menu say-lines get wrongly a
+            # "if True:" attached.
+
+            # The non-Unicode string "True" is the condition for else:.
+            if (i + 1) == len(ast.entries) and (
+                    condition == "True" or not isinstance(condition, str)):
                 self.write(" if %s" % condition)
             self.write(":")
             self.print_nodes(block, 1)
