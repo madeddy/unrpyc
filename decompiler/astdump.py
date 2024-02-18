@@ -18,11 +18,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from __future__ import unicode_literals
 
 import sys
 import inspect
-import codegen
+from . import codegen
 import ast as py_ast
 import renpy
 
@@ -31,17 +30,19 @@ def pprint(out_file, ast, decompile_python=False, comparable=False, no_pyexpr=Fa
     # the config and creates the AstDumper instance
     AstDumper(out_file, decompile_python=decompile_python, comparable=comparable, no_pyexpr=no_pyexpr).dump(ast)
 
+    
 class AstDumper(object):
     """
     An object which handles the walking of a tree of python objects
     it will create a human-readable representation of all interesting
     attributes and write this to a given stream
     """
+
     MAP_OPEN = {list: '[', tuple: '(', set: 'set({', frozenset: 'frozenset({'}
     MAP_CLOSE = {list: ']', tuple: ')', set: '})', frozenset: '})'}
 
     def __init__(self, out_file=None, decompile_python=False, no_pyexpr=False,
-                 comparable=False, indentation=u'    '):
+                 comparable=False, indentation='    '):
         self.indentation = indentation
         self.out_file = out_file or sys.stdout
         self.decompile_python = decompile_python
@@ -66,15 +67,16 @@ class AstDumper(object):
             return
         self.passed.append(ast)
         self.passed_where.append(self.linenumber)
-        if isinstance(ast, (list, tuple, set, frozenset)):
+        # renpy 7.5/8 combat; renpy removed frozenset
+        if isinstance(ast, (list, tuple, set)):
             self.print_list(ast)
         elif isinstance(ast, renpy.ast.PyExpr):
             self.print_pyexpr(ast)
         elif isinstance(ast, dict):
             self.print_dict(ast)
-        elif isinstance(ast, (str, unicode)):
+        elif isinstance(ast, str):
             self.print_string(ast)
-        elif isinstance(ast, (int, long, bool)) or ast is None:
+        elif isinstance(ast, (int, bool)) or ast is None:
             self.print_other(ast)
         elif inspect.isclass(ast):
             self.print_class(ast)
@@ -87,10 +89,11 @@ class AstDumper(object):
 
     def print_list(self, ast):
         # handles the printing of simple containers of N elements.
-        if type(ast) not in (list, tuple, set, frozenset):
+        # renpy 7.5/8 combat; renpy removed frozenset
+        if type(ast) not in (list, tuple, set):
             self.p(repr(type(ast)))
 
-            for k in (list, tuple, set, frozenset):
+            for k in (list, tuple, set):
                 if isinstance(ast, k):
                     klass = k
 
@@ -110,7 +113,7 @@ class AstDumper(object):
 
     def print_dict(self, ast):
         # handles the printing of dictionaries
-        if type(ast) != dict:
+        if not isinstance(ast, dict):
             self.p(repr(type(ast)))
 
         self.p('{')
@@ -135,19 +138,21 @@ class AstDumper(object):
             ast.serial = 0
         elif key == 'col_offset':
             ast.col_offset = 0 # TODO maybe make this match?
-        elif key == 'name' and type(ast.name) == tuple:
+        elif key == 'name' and isinstance(ast.name, tuple):
             name = ast.name[0]
-            if isinstance(name, unicode):
+            if isinstance(name, str):
                 name = name.encode('utf-8')
-            ast.name = (name.split(b'/')[-1], 0, 0)
-        elif key == 'location' and type(ast.location) == tuple:
+            # this bytes string should be uneeded
+            # ast.name = (name.split(b'/')[-1], 0, 0)
+            ast.name = (name.split('/')[-1], 0, 0)
+        elif key == 'location' and isinstance(ast.location, tuple):
             if len(ast.location) == 4:
                 ast.location = (ast.location[0].split('/')[-1].split('\\')[-1], ast.location[1], ast.location[2], 0)
             elif len(ast.location) == 3:
                 ast.location = (ast.location[0].split('/')[-1].split('\\')[-1], ast.location[1], 0)
             elif len(ast.location) == 2:
                 ast.location = (ast.location[0].split('/')[-1].split('\\')[-1], ast.location[1])
-        elif key == 'loc' and type(ast.loc) == tuple:
+        elif key == 'loc' and isinstance(ast.loc, tuple):
             ast.loc = (ast.loc[0].split('/')[-1].split('\\')[-1], ast.loc[1])
         elif key == 'filename':
             ast.filename = ast.filename.split('/')[-1].split('\\')[-1]
@@ -156,7 +161,7 @@ class AstDumper(object):
             # When no parameters exist, some versions of Ren'Py set parameters
             # to None and some don't set it at all.
             return False
-        elif (key == 'hide' and ast.hide == False and
+        elif (key == 'hide' and ast.hide is False and
             (isinstance(ast, renpy.ast.Python) or
             isinstance(ast, renpy.ast.Label))):
             # When hide isn't set, some versions of Ren'Py set it to False and
@@ -206,7 +211,7 @@ class AstDumper(object):
 
         if isinstance(ast, py_ast.Module) and self.decompile_python:
             self.p('.code = ')
-            self.print_ast(codegen.to_source(ast, unicode(self.indentation)))
+            self.print_ast(codegen.to_source(ast, str(self.indentation)))
             self.p('>')
             return
 
@@ -240,10 +245,11 @@ class AstDumper(object):
     def print_string(self, ast):
         # prints the representation of a string. If there are newlines in this string,
         # it will print it as a docstring.
-        if b'\n' in ast:
-            astlist = ast.split(b'\n')
-            if isinstance(ast, unicode):
-                self.p('u')
+        # py3 combat
+        if '\n' in ast:
+            astlist = ast.split('\n')
+            # if isinstance(ast, str):
+            #     self.p('u')
             self.p('"""')
             self.p(self.escape_string(astlist.pop(0)))
             for i, item in enumerate(astlist):
@@ -257,9 +263,10 @@ class AstDumper(object):
 
     def escape_string(self, string):
         # essentially the representation of a string without the surrounding quotes
-        if isinstance(string, unicode):
-            return repr(string)[2:-1]
-        elif isinstance(string, str):
+        # py3 combat: This cuts also the first line char away because the u is now missing
+        # if isinstance(string, str):
+        #     return repr(string)[2:-1]
+        if isinstance(string, str):
             return repr(string)[1:-1]
         else:
             return string
@@ -274,10 +281,11 @@ class AstDumper(object):
         # shouldn't indent in case there's only one or zero objects in this object to print
         if ast is None or len(ast) > 1:
             self.indent += diff_indent
-            self.p(u'\n' + self.indentation * self.indent)
+            self.p('\n' + self.indentation * self.indent)
 
     def p(self, string):
         # write the string to the stream
-        string = unicode(string)
+        # py3 combat: Not sure if the next line still needed is; the str() was unicode
+        string = str(string)
         self.linenumber += string.count('\n')
         self.out_file.write(string)
